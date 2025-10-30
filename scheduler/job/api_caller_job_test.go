@@ -142,6 +142,10 @@ func TestNewApiCallerJob(t *testing.T) {
 			if job.ID == "" {
 				t.Errorf("NewApiCallerJob() ID should not be empty")
 			}
+			// Verify ID has the "capi:" namespace prefix
+			if len(job.ID) < 5 || job.ID[:5] != "capi:" {
+				t.Errorf("NewApiCallerJob() ID should start with 'capi:' prefix, got %v", job.ID)
+			}
 		})
 	}
 }

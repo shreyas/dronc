@@ -51,11 +51,22 @@ func TestNewJob(t *testing.T) {
 			jobType:  AtMostOnce,
 			wantErr:  false,
 		},
+		{
+			name:     "invalid - empty namespace",
+			schedule: "0 0 * * *",
+			jobType:  AtMostOnce,
+			wantErr:  true,
+			errMsg:   "namespace cannot be empty",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			job, err := newJob(tt.schedule, tt.jobType)
+			namespace := "test"
+			if tt.name == "invalid - empty namespace" {
+				namespace = ""
+			}
+			job, err := newJob(tt.schedule, namespace, tt.jobType)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("newJob() expected error but got none")

@@ -16,7 +16,7 @@ type ApiCallerJob struct {
 // NewApiCallerJob creates a new ApiCallerJob from an ApiCallerJobRequest
 func NewApiCallerJob(req ApiCallerJobRequest) (*ApiCallerJob, error) {
 	// Create base job (validates schedule)
-	job, err := newJob(req.Schedule, req.Type)
+	job, err := newJob(req.Schedule, "capi", req.Type)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func NewApiCallerJob(req ApiCallerJobRequest) (*ApiCallerJob, error) {
 	normalizedURL := parsedURL.String()
 
 	// Generate unique ID based on normalized values
-	id := generateApiCallerJobID(job.Schedule, job.Type, normalizedURL)
+	id := generateApiCallerJobID(job.namespace, job.Schedule, job.Type, normalizedURL)
 	job.ID = id
 
 	return &ApiCallerJob{
@@ -44,8 +44,8 @@ func NewApiCallerJob(req ApiCallerJobRequest) (*ApiCallerJob, error) {
 }
 
 // generateApiCallerJobID creates a unique ID for the ApiCallerJob
-func generateApiCallerJobID(schedule string, jobType JobRunGuarantee, api string) string {
+func generateApiCallerJobID(namespace, schedule string, jobType JobRunGuarantee, api string) string {
 	hashInput := fmt.Sprintf("api_caller:%s:%d:%s", schedule, jobType, api)
 	hash := sha256.Sum256([]byte(hashInput))
-	return hex.EncodeToString(hash[:])
+	return fmt.Sprintf("%s:%s", namespace, hex.EncodeToString(hash[:]))
 }
