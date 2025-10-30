@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shreyas/dronc/api"
 	redisClient "github.com/shreyas/dronc/lib/redis"
 )
 
@@ -14,6 +15,15 @@ func Setup() *gin.Engine {
 	router.GET("/", rootHandler)
 	router.GET("/health", healthHandler)
 	router.GET("/health/deep", deepHealthHandler)
+
+	// v1 API routes
+	v1 := router.Group("/v1")
+	{
+		schedule := v1.Group("/schedule")
+		{
+			schedule.POST("/api-caller", api.ScheduleApiCaller)
+		}
+	}
 
 	return router
 }

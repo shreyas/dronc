@@ -52,6 +52,71 @@ dronc/
   - Returns: `{"status": "healthy", "checks": {"redis": "healthy"}}` if dronc and all its dependencies are healthy
   - Returns 503 if Redis is unreachable
 
+### Job Scheduling
+
+#### Schedule API Caller Job
+
+**`POST /v1/schedule/api-caller`**
+
+Schedule a job that calls an HTTP API endpoint at specified intervals.
+
+**Request Body:**
+```json
+{
+  "schedule": "0 0 * * *",
+  "api": "https://example.com/webhook",
+  "type": "ATMOST_ONCE"
+}
+```
+
+**Request Fields:**
+- `schedule` (string, required): Cron expression defining when the job runs
+  - Examples:
+    - `"0 0 * * *"` - Daily at midnight
+    - `"*/5 * * * *"` - Every 5 minutes
+    - `"0 9-17 * * MON-FRI"` - Every hour from 9 AM to 5 PM on weekdays
+- `api` (string, required): HTTP/HTTPS URL to call when job executes
+- `type` (string, required): Job execution guarantee
+  - `"ATMOST_ONCE"` - Job executes at most once per scheduled interval (may skip on failures)
+  - `"ATLEAST_ONCE"` - Job executes at least once per scheduled interval (retries on failures)
+
+**Success Response (201 Created):**
+```json
+{
+  "job_id": "a3f5c8d9e2b1f4a6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+  "schedule": "0 0 * * *",
+  "api": "https://example.com/webhook",
+  "type": "ATMOST_ONCE"
+}
+```
+
+**Error Response (400 Bad Request):**
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Detailed error message",
+    "field": "field_name"
+  }
+}
+```
+
+**Error Codes:**
+- `INVALID_REQUEST` - Missing required fields or malformed JSON
+- `VALIDATION_ERROR` - Invalid URL format or invalid type value
+- `JOB_CREATION_FAILED` - Invalid cron expression or unsupported URL scheme
+
+**Example Usage:**
+```bash
+curl -X POST http://localhost:8080/v1/schedule/api-caller \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schedule": "*/10 * * * *",
+    "api": "https://api.example.com/status-check",
+    "type": "ATLEAST_ONCE"
+  }'
+```
+
 ### Routes
 
 - **`GET /`** - Root endpoint
