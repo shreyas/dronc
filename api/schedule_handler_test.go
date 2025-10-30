@@ -7,11 +7,26 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	redisClient "github.com/shreyas/dronc/lib/redis"
 )
 
 func TestScheduleApiCaller(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+
+	// Setup miniredis for testing
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("Failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	// Initialize global redis client for tests
+	redisClient.Client = redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
 
 	tests := []struct {
 		name           string

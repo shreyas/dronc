@@ -6,6 +6,8 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
+	redisClient "github.com/shreyas/dronc/lib/redis"
+	"github.com/shreyas/dronc/scheduler"
 	"github.com/shreyas/dronc/scheduler/job"
 )
 
@@ -122,7 +124,17 @@ func ScheduleApiCaller(c *gin.Context) {
 		return
 	}
 
-	// TODO: Store the job in Redis/scheduler
+	// Store the job in Redis
+	jobsManager := scheduler.NewJobsManager(redisClient.Client)
+	if err := jobsManager.SetupNewJob(c.Request.Context(), apiCallerJob); err != nil {
+		c.JSON(http.StatusInternalServerError, errorResponse{
+			Error: errorDetail{
+				Code:    "STORAGE_ERROR",
+				Message: "Failed to store job: " + err.Error(),
+			},
+		})
+		return
+	}
 
 	// Return success response
 	c.JSON(http.StatusCreated, scheduleApiCallerResponse{
