@@ -16,6 +16,10 @@ type JobsManagerInterface interface {
 	// It reads due job-specs in batches, fetches job details, and routes to guarantee-specific channels
 	StartJobBatchProcessor(ctx context.Context)
 
+	// StartAtloProcessor begins the at-least-once job processor goroutine
+	// It reads job execution requests from the atloChannel and spawns worker goroutines for each job
+	StartAtloProcessor(ctx context.Context)
+
 	// GetDueJobsChannel returns a read-only channel for consuming due job-specs
 	GetDueJobsChannel() <-chan string
 

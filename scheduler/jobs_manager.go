@@ -32,6 +32,9 @@ type JobsManager struct {
 	// atmoChannel is the channel for AtMostOnce guarantee jobs
 	atmoChannel chan JobExecutionRequest
 
+	// atloProcessor handles the processing of at-least-once jobs
+	atloProcessor *atloProcessor
+
 	// configurations
 	// how many schedules to generate on setup of a new job
 	numSchedulesToGenerate int
@@ -51,12 +54,17 @@ func NewJobsManager(jobsRepo repository.JobsRepositoryInterface, schedulesRepo r
 		schedulesRepo = repository.NewSchedulesRepository(redis.Client)
 	}
 
+	// Create ATLO processor dependencies
+	execEventsRepo := repository.NewExecEventsRepository(redis.Client)
+	atloProcessor := newAtloProcessor(jobsRepo, execEventsRepo)
+
 	return &JobsManager{
 		repo:          jobsRepo,
 		schedulesRepo: schedulesRepo,
 		dueJobsChan:   make(chan string, 1000),               // Buffered channel for handling bursts
 		atloChannel:   make(chan JobExecutionRequest, 10000), // AtLeastOnce jobs
 		atmoChannel:   make(chan JobExecutionRequest, 10000), // AtMostOnce jobs
+		atloProcessor: atloProcessor,
 
 		// config options
 		numSchedulesToGenerate: 5,
@@ -256,6 +264,39 @@ func (m *JobsManager) StartDueJobsFinder(ctx context.Context) {
 					logger.Error("failed to find due jobs", "error", err)
 					// Continue running even on error
 				}
+			}
+		}
+	}()
+}
+
+// StartAtloProcessor begins the at-least-once job processor goroutine
+// It reads job execution requests from the atloChannel and spawns worker goroutines for each job
+// The goroutine runs until the context is cancelled and recovers from all panics
+func (m *JobsManager) StartAtloProcessor(ctx context.Context) {
+	go func() {
+		// Recover from any panics to prevent goroutine death
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("atlo processor goroutine panicked and recovered", "panic", r)
+				// Restart the goroutine after a panic
+				logger.Info("restarting atlo processor goroutine after panic")
+				m.StartAtloProcessor(ctx)
+			}
+		}()
+
+		logger.Info("atlo processor goroutine started")
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("atlo processor goroutine stopping due to context cancellation")
+				// Wait for all worker goroutines to complete
+				m.atloProcessor.Wait()
+				logger.Info("all atlo worker goroutines completed")
+				return
+			case req := <-m.atloChannel:
+				// Process the job (spawns worker goroutine internally)
+				m.atloProcessor.Process(ctx, req)
 			}
 		}
 	}()

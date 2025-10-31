@@ -46,7 +46,8 @@ func main() {
 	jobsManager := scheduler.NewJobsManager(nil, nil)
 	jobsManager.StartDueJobsFinder(ctx)
 	jobsManager.StartJobBatchProcessor(ctx)
-	logger.Info("jobs manager started with due jobs finder and batch processor")
+	jobsManager.StartAtloProcessor(ctx)
+	logger.Info("jobs manager started with due jobs finder, batch processor, and atlo processor")
 
 	// Create HTTP server for API routes
 	server := httpserver.New(routes.Setup())
