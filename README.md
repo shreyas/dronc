@@ -122,6 +122,43 @@ curl -X POST http://localhost:8080/v1/schedule/api-caller \
 - **`GET /`** - Root endpoint
   - Returns: `"Dronc - Redis-backed Job Scheduler"`
 
+## Observability
+
+### Track Executions
+
+Retrieve recent execution events (useful for debugging job runs and latency analysis).
+
+- **`GET /v1/track/executions`** - Returns recent execution events recorded in Redis streams.
+
+Query parameters:
+- `limit` (optional, positive integer): maximum number of events to return. Default: 50. Maximum: 200.
+- `job_id` (optional): filter events to a specific job identifier.
+
+Response shape:
+
+```json
+{
+  "count": 2,
+  "executions": [
+    {
+      "id": "169f3a8b-0b8c-...",
+      "job_id": "capi:...",
+      "scheduled_time": 1698764400,
+      "execution_time": 1698764412,
+      "status_code": 200,
+      "success": true,
+      "time_taken_ms": 28
+    }
+  ]
+}
+```
+
+Notes:
+- `time_taken_ms` is recorded for each execution and represents the elapsed time in milliseconds for the job's call.
+- If Redis isn't initialized, the endpoint responds with a 500 and an error code `REDIS_NOT_INITIALIZED`.
+- Invalid `limit` values return 400 with `INVALID_REQUEST`.
+
+
 ## Quick Start
 
 ### Local Development
