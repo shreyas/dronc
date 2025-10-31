@@ -6,10 +6,8 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
-	redisClient "github.com/shreyas/dronc/lib/redis"
 	"github.com/shreyas/dronc/scheduler"
 	"github.com/shreyas/dronc/scheduler/job"
-	"github.com/shreyas/dronc/scheduler/repository"
 )
 
 var urlRegex = regexp.MustCompile(`^https?://.+$`)
@@ -125,9 +123,9 @@ func ScheduleApiCaller(c *gin.Context) {
 		return
 	}
 
-	// Store the job in Redis
-	repo := repository.NewJobsRepository(redisClient.Client)
-	jobsManager := scheduler.NewJobsManager(repo)
+	// Store the job in Redis and schedule its next occurrences
+	// todo: target call should look like this - scheduler.NewJobsManager()
+	jobsManager := scheduler.NewJobsManager(nil, nil)
 	if err := jobsManager.SetupNewJob(c.Request.Context(), apiCallerJob); err != nil {
 		c.JSON(http.StatusInternalServerError, errorResponse{
 			Error: errorDetail{

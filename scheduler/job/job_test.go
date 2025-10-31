@@ -2,6 +2,7 @@ package job
 
 import (
 	"testing"
+	"time"
 )
 
 func TestNewJob(t *testing.T) {
@@ -101,4 +102,105 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestJob_NextOccurance(t *testing.T) {
+	tests := []struct {
+		name     string
+		schedule string
+		after    int64
+		wantErr  bool
+	}{
+		{
+			name:     "daily at midnight - next occurrence",
+			schedule: "0 0 * * *",
+			after:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC).Unix(),
+			wantErr:  false,
+		},
+		{
+			name:     "every 5 minutes - next occurrence",
+			schedule: "*/5 * * * *",
+			after:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC).Unix(),
+			wantErr:  false,
+		},
+		{
+			name:     "hourly - next occurrence",
+			schedule: "0 * * * *",
+			after:    time.Date(2024, 1, 1, 12, 30, 0, 0, time.UTC).Unix(),
+			wantErr:  false,
+		},
+
+		// TODO: add tests for jobs that run every second
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			job, err := newJob(tt.schedule, AtMostOnce)
+			if err != nil {
+				t.Fatalf("newJob() failed to create job: %v", err)
+			}
+
+			nextOccurrence, err := job.NextOccurance(tt.after)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("NextOccurance() expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("NextOccurance() unexpected error = %v", err)
+				return
+			}
+
+			// Verify the next occurrence is after the given time
+			if nextOccurrence <= tt.after {
+				t.Errorf("NextOccurance() returned %v which is not after %v", nextOccurrence, tt.after)
+			}
+		})
+	}
+}
+
+func TestJob_NextOccurance_Sequential(t *testing.T) {
+	// Test that we can generate multiple sequential occurrences
+	job, err := newJob("*/5 * * * *", AtMostOnce)
+	if err != nil {
+		t.Fatalf("newJob() failed: %v", err)
+	}
+
+	// Start with a known time: 2024-01-01 12:00:00 UTC
+	currentTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC).Unix()
+
+	// Generate 5 occurrences
+	occurrences := make([]int64, 0, 5)
+	for i := 0; i < 5; i++ {
+		next, err := job.NextOccurance(currentTime)
+		if err != nil {
+			t.Fatalf("NextOccurance() iteration %d failed: %v", i, err)
+		}
+
+		// Verify it's after current time
+		if next <= currentTime {
+			t.Errorf("Occurrence %d: got %v, expected > %v", i, next, currentTime)
+		}
+
+		occurrences = append(occurrences, next)
+		currentTime = next
+	}
+
+	// Verify all occurrences are unique and increasing
+	for i := 1; i < len(occurrences); i++ {
+		if occurrences[i] <= occurrences[i-1] {
+			t.Errorf("Occurrences not strictly increasing: %v <= %v", occurrences[i], occurrences[i-1])
+		}
+	}
+
+	// For a "*/5 * * * *" schedule, occurrences should be ~5 minutes apart
+	expectedDiff := int64(5 * 60) // 5 minutes in seconds
+	for i := 1; i < len(occurrences); i++ {
+		diff := occurrences[i] - occurrences[i-1]
+		if diff != expectedDiff {
+			t.Errorf("Occurrence %d: difference = %v seconds, want %v seconds", i, diff, expectedDiff)
+		}
+	}
 }

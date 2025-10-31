@@ -53,16 +53,3 @@ func generateApiCallerJobID(schedule string, jobType JobRunGuarantee, api string
 func (jcapi *ApiCallerJob) Namespace() string {
 	return "capi"
 }
-
-func (jcapi *ApiCallerJob) AtMostOnce() bool {
-	return jcapi.Type == AtMostOnce
-}
-
-func (jcapi *ApiCallerJob) AtLeastOnce() bool {
-	return jcapi.Type == AtLeastOnce
-}
-
-func (jcapi *ApiCallerJob) NextOccurance(after int64) (int64, error) {
-	//TODO implement me
-	panic("implement me")
-}

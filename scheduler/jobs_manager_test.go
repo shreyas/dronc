@@ -28,7 +28,8 @@ func TestJobsManager_SetupNewJob_ApiCallerJob(t *testing.T) {
 	defer mr.Close()
 
 	repo := repository.NewJobsRepository(client)
-	manager := NewJobsManager(repo)
+	schedulesRepo := repository.NewSchedulesRepository(client)
+	manager := NewJobsManager(repo, schedulesRepo)
 	ctx := context.Background()
 
 	apiJob, err := job.NewApiCallerJob(job.ApiCallerJobRequest{
@@ -73,6 +74,34 @@ func TestJobsManager_SetupNewJob_ApiCallerJob(t *testing.T) {
 	if hash["api"] != "https://example.com/api" {
 		t.Errorf("Saved job api = %v, want %v", hash["api"], "https://example.com/api")
 	}
+
+	// Verify schedules were created in the sorted set
+	schedulesKey := "dronc:schedules"
+	schedules, err := client.ZRangeWithScores(ctx, schedulesKey, 0, -1).Result()
+	if err != nil {
+		t.Fatalf("Failed to read schedules from Redis: %v", err)
+	}
+
+	// Should have 5 schedules (numSchedulesToGenerate)
+	if len(schedules) != 5 {
+		t.Errorf("Expected 5 schedules, got %d", len(schedules))
+	}
+
+	// Verify all schedules are formatted correctly (jobID:timestamp)
+	for i, schedule := range schedules {
+		expectedPrefix := apiJob.ID + ":"
+		member := schedule.Member.(string)
+		if len(member) <= len(expectedPrefix) || member[:len(expectedPrefix)] != expectedPrefix {
+			t.Errorf("Schedule %d member = %v, want format %v<timestamp>", i, member, expectedPrefix)
+		}
+	}
+
+	// Verify schedules are in chronological order
+	for i := 1; i < len(schedules); i++ {
+		if schedules[i].Score <= schedules[i-1].Score {
+			t.Errorf("Schedules not in chronological order: %v <= %v", schedules[i].Score, schedules[i-1].Score)
+		}
+	}
 }
 
 func TestJobsManager_SetupNewJob_UnsupportedType(t *testing.T) {
@@ -80,7 +109,8 @@ func TestJobsManager_SetupNewJob_UnsupportedType(t *testing.T) {
 	defer mr.Close()
 
 	repo := repository.NewJobsRepository(client)
-	manager := NewJobsManager(repo)
+	schedulesRepo := repository.NewSchedulesRepository(client)
+	manager := NewJobsManager(repo, schedulesRepo)
 	ctx := context.Background()
 
 	// Try to setup an unsupported job type
@@ -105,7 +135,8 @@ func TestJobsManager_SetupNewJob_MultipleJobs(t *testing.T) {
 	defer mr.Close()
 
 	repo := repository.NewJobsRepository(client)
-	manager := NewJobsManager(repo)
+	schedulesRepo := repository.NewSchedulesRepository(client)
+	manager := NewJobsManager(repo, schedulesRepo)
 	ctx := context.Background()
 
 	jobs := []job.ApiCallerJobRequest{
@@ -160,7 +191,8 @@ func TestJobsManager_SetupNewJob_IdempotencyCheck(t *testing.T) {
 	defer mr.Close()
 
 	repo := repository.NewJobsRepository(client)
-	manager := NewJobsManager(repo)
+	schedulesRepo := repository.NewSchedulesRepository(client)
+	manager := NewJobsManager(repo, schedulesRepo)
 	ctx := context.Background()
 
 	// Create the same job twice (same parameters)
