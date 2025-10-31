@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shreyas/dronc/lib/logger"
 	"github.com/shreyas/dronc/lib/redis"
 	"github.com/shreyas/dronc/scheduler/job"
 	"github.com/shreyas/dronc/scheduler/repository"
@@ -14,6 +15,9 @@ import (
 type JobsManager struct {
 	repo          repository.JobsRepositoryInterface
 	schedulesRepo repository.SchedulesRepositoryInterface
+
+	// dueJobsChan is the channel where due job-specs are pushed
+	dueJobsChan chan string
 
 	// configurations
 	// how many schedules to generate on setup of a new job
@@ -37,10 +41,56 @@ func NewJobsManager(repo repository.JobsRepositoryInterface, schedulesRepo repos
 	return &JobsManager{
 		repo:          repo,
 		schedulesRepo: schedulesRepo,
+		dueJobsChan:   make(chan string, 1000), // Buffered channel for handling bursts
 
 		// config options
 		numSchedulesToGenerate: 5,
 	}
+}
+
+// GetDueJobsChannel returns a read-only channel for consuming due job-specs
+func (m *JobsManager) GetDueJobsChannel() <-chan string {
+	return m.dueJobsChan
+}
+
+// StartDueJobsFinder begins the due jobs finder goroutine that runs every second
+// It finds jobs that are due and pushes them to the due jobs channel
+// The goroutine runs until the context is cancelled and recovers from all panics
+func (m *JobsManager) StartDueJobsFinder(ctx context.Context) {
+	go func() {
+		// Recover from any panics to prevent goroutine death
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("due jobs finder goroutine panicked and recovered", "panic", r)
+				// Restart the goroutine after a panic
+				logger.Info("restarting due jobs finder goroutine after panic")
+				m.StartDueJobsFinder(ctx)
+
+				// todo: maybe it's better to let it panic and fail fast, rather than keep panicking and recovering
+			}
+		}()
+
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		logger.Info("due jobs finder goroutine started")
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("due jobs finder goroutine stopping due to context cancellation")
+				return
+			case <-ticker.C:
+				// Find due jobs up to current time
+				currentTime := time.Now().Unix()
+				err := m.schedulesRepo.FindDueJobs(ctx, currentTime, m.dueJobsChan)
+				if err != nil {
+					logger.Error("failed to find due jobs", "error", err)
+					// Continue running even on error
+				}
+			}
+		}
+	}()
 }
 
 // SetupNewJob stores a new job in the repository and schedules its next occurrences

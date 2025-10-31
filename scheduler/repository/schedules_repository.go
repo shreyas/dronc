@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-
 	"github.com/redis/go-redis/v9"
 )
 
@@ -41,6 +40,54 @@ func (r *SchedulesRepository) AddSchedules(ctx context.Context, jobID string, ti
 	_, err := pipe.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to add schedules to redis: %w", err)
+	}
+
+	return nil
+}
+
+// FindDueJobs finds all jobs due until the specified timestamp, moves them to the due_jobs set,
+// removes them from the schedules sorted set, and pushes the job-specs (in the format jobID:timestamp) to the provided channel
+func (r *SchedulesRepository) FindDueJobs(ctx context.Context, untilTimestamp int64, jobsChan chan<- string) error {
+	// Lua script to atomically find due jobs, move them to due_jobs set, and remove from schedules
+	var findDueJobsScript = redis.NewScript(`
+local schedules_key = KEYS[1]
+local due_jobs_key = KEYS[2]
+local until_timestamp = ARGV[1]
+
+-- Find all due jobs
+local due_jobs = redis.call('ZRANGEBYSCORE', schedules_key, '-inf', until_timestamp)
+
+if #due_jobs > 0 then
+    -- Add to due_jobs set
+    redis.call('SADD', due_jobs_key, unpack(due_jobs))
+
+    -- Remove from schedules
+    redis.call('ZREMRANGEBYSCORE', schedules_key, '-inf', until_timestamp)
+end
+
+return due_jobs
+`)
+	// Execute the Lua script
+	result, err := findDueJobsScript.Run(ctx, r.client, []string{schedulesKey, dueJobsKey}, untilTimestamp).Result()
+	if err != nil {
+		return fmt.Errorf("failed to find due jobs: %w", err)
+	}
+
+	// Parse the result (array of jobs in format "jobID:timestamp")
+	jobs, ok := result.([]interface{})
+	if !ok {
+		return fmt.Errorf("unexpected result type from Lua script: %T", result)
+	}
+
+	// Extract job IDs and push to channel
+	for _, jobspec := range jobs {
+
+		// Push to channel
+		select {
+		case jobsChan <- jobspec.(string):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return nil
