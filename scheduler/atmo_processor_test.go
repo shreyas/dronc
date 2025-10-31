@@ -69,6 +69,10 @@ func (m *mockExecEventsRepoAtmo) SaveExecutionEvent(ctx context.Context, event r
 	return nil
 }
 
+func (m *mockExecEventsRepoAtmo) ListExecutionEvents(ctx context.Context, query repository.ExecutionEventsQuery) ([]repository.ExecutionEventRecord, error) {
+	return nil, nil
+}
+
 func TestAtmoProcessor_callAPI_Success(t *testing.T) {
 	// Create a test server that always succeeds
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

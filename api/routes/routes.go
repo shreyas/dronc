@@ -23,6 +23,11 @@ func Setup() *gin.Engine {
 		{
 			schedule.POST("/api-caller", api.ScheduleApiCaller)
 		}
+
+		track := v1.Group("/track")
+		{
+			track.GET("/executions", api.TrackExecutions)
+		}
 	}
 
 	return router

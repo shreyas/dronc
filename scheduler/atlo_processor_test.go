@@ -71,6 +71,10 @@ func (m *mockExecEventsRepo) SaveExecutionEvent(ctx context.Context, event repos
 	return m.saveErr
 }
 
+func (m *mockExecEventsRepo) ListExecutionEvents(ctx context.Context, query repository.ExecutionEventsQuery) ([]repository.ExecutionEventRecord, error) {
+	return nil, nil
+}
+
 func TestAtloProcessor_extractTimestampFromJobSpec(t *testing.T) {
 	tests := []struct {
 		name      string
