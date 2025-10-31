@@ -42,10 +42,11 @@ func main() {
 	defer cancel()
 	defer func() { _ = redisClient.Close() }()
 
-	// Create JobsManager and start the due jobs finder goroutine
+	// Create JobsManager and start the processing goroutines
 	jobsManager := scheduler.NewJobsManager(nil, nil)
 	jobsManager.StartDueJobsFinder(ctx)
-	logger.Info("jobs manager started with due jobs finder")
+	jobsManager.StartJobBatchProcessor(ctx)
+	logger.Info("jobs manager started with due jobs finder and batch processor")
 
 	// Create HTTP server for API routes
 	server := httpserver.New(routes.Setup())

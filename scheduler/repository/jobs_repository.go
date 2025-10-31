@@ -76,3 +76,58 @@ func (r *JobsRepository) Exists(ctx context.Context, jobID string) (bool, error)
 
 	return count > 0, nil
 }
+
+// MultiGetApiCallerJobs retrieves multiple ApiCallerJobs from Redis in a single pipelined operation
+// Returns: successful lookups map, failed job IDs, error
+func (r *JobsRepository) MultiGetApiCallerJobs(ctx context.Context, jobIDs []string) (map[string]*job.ApiCallerJob, []string, error) {
+	if len(jobIDs) == 0 {
+		return make(map[string]*job.ApiCallerJob), []string{}, nil
+	}
+
+	// Use pipeline for batch fetching
+	pipe := r.client.Pipeline()
+
+	// Queue all HGETALL commands
+	cmds := make(map[string]*redis.MapStringStringCmd)
+	for _, jobID := range jobIDs {
+		key := buildRedisKey(jobID)
+		cmds[jobID] = pipe.HGetAll(ctx, key)
+	}
+
+	// Execute pipeline
+	_, err := pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		return nil, nil, fmt.Errorf("failed to execute multi-get pipeline: %w", err)
+	}
+
+	// Process results
+	successfulJobs := make(map[string]*job.ApiCallerJob)
+	failedJobIDs := make([]string, 0)
+
+	for jobID, cmd := range cmds {
+		result, err := cmd.Result()
+		if err != nil {
+			// Job fetch failed
+			failedJobIDs = append(failedJobIDs, jobID)
+			continue
+		}
+
+		if len(result) == 0 {
+			// Job not found
+			failedJobIDs = append(failedJobIDs, jobID)
+			continue
+		}
+
+		// Reconstruct job from hash
+		apiJob, err := apiCallerJobFromRedisHash(jobID, result)
+		if err != nil {
+			// Job reconstruction failed
+			failedJobIDs = append(failedJobIDs, jobID)
+			continue
+		}
+
+		successfulJobs[jobID] = apiJob
+	}
+
+	return successfulJobs, failedJobIDs, nil
+}

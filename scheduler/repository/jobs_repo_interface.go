@@ -23,6 +23,10 @@ type JobsRepositoryInterface interface {
 	// GetApiCallerJob retrieves an ApiCallerJob by job ID
 	GetApiCallerJob(ctx context.Context, jobID string) (*job.ApiCallerJob, error)
 
+	// MultiGetApiCallerJobs retrieves multiple ApiCallerJobs from Redis in a single pipelined operation
+	// Returns: successful lookups map, failed job IDs, error
+	MultiGetApiCallerJobs(ctx context.Context, jobIDs []string) (map[string]*job.ApiCallerJob, []string, error)
+
 	// Delete removes a job from Redis by job ID
 	Delete(ctx context.Context, jobID string) error
 
