@@ -13,6 +13,7 @@ import (
 	"github.com/shreyas/dronc/lib/httpserver"
 	"github.com/shreyas/dronc/lib/logger"
 	redisClient "github.com/shreyas/dronc/lib/redis"
+	"github.com/shreyas/dronc/scheduler"
 )
 
 var (
@@ -41,6 +42,11 @@ func main() {
 	defer cancel()
 	defer func() { _ = redisClient.Close() }()
 
+	// Create JobsManager and start the due jobs finder goroutine
+	jobsManager := scheduler.NewJobsManager(nil, nil)
+	jobsManager.StartDueJobsFinder(ctx)
+	logger.Info("jobs manager started with due jobs finder")
+
 	// Create HTTP server for API routes
 	server := httpserver.New(routes.Setup())
 
@@ -59,7 +65,7 @@ func main() {
 
 	logger.Info("shutdown signal received, gracefully shutting down")
 
-	// Cancel context to signal all components
+	// Cancel context to signal all components (including due jobs finder)
 	cancel()
 
 	// Graceful shutdown with timeout

@@ -126,6 +126,7 @@ func ScheduleApiCaller(c *gin.Context) {
 	// Store the job in Redis and schedule its next occurrences
 	// todo: target call should look like this - scheduler.NewJobsManager()
 	jobsManager := scheduler.NewJobsManager(nil, nil)
+	// todo: pass the jobsManager from main.go (either via ctx, or via gin in someway) instead of creating a new one here
 	if err := jobsManager.SetupNewJob(c.Request.Context(), apiCallerJob); err != nil {
 		c.JSON(http.StatusInternalServerError, errorResponse{
 			Error: errorDetail{
