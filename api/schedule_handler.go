@@ -9,6 +9,7 @@ import (
 	redisClient "github.com/shreyas/dronc/lib/redis"
 	"github.com/shreyas/dronc/scheduler"
 	"github.com/shreyas/dronc/scheduler/job"
+	"github.com/shreyas/dronc/scheduler/repository"
 )
 
 var urlRegex = regexp.MustCompile(`^https?://.+$`)
@@ -125,7 +126,8 @@ func ScheduleApiCaller(c *gin.Context) {
 	}
 
 	// Store the job in Redis
-	jobsManager := scheduler.NewJobsManager(redisClient.Client)
+	repo := repository.NewJobsRepository(redisClient.Client)
+	jobsManager := scheduler.NewJobsManager(repo)
 	if err := jobsManager.SetupNewJob(c.Request.Context(), apiCallerJob); err != nil {
 		c.JSON(http.StatusInternalServerError, errorResponse{
 			Error: errorDetail{

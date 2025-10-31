@@ -20,9 +20,8 @@ func NewJobsRepository(client *redis.Client) *JobsRepository {
 
 // SaveApiCallerJob stores an ApiCallerJob in Redis as a hash
 func (r *JobsRepository) SaveApiCallerJob(ctx context.Context, j *job.ApiCallerJob) error {
-	mapper := newApiCallerJobMapper(j)
-	key := mapper.redisKey()
-	hash := mapper.toRedisHash()
+	key := buildRedisKey(j.ID)
+	hash := apiCallerJobToRedisHash(j)
 
 	err := r.client.HSet(ctx, key, hash).Err()
 	if err != nil {
@@ -32,9 +31,9 @@ func (r *JobsRepository) SaveApiCallerJob(ctx context.Context, j *job.ApiCallerJ
 	return nil
 }
 
-// Get retrieves a job from Redis by job ID
-func (r *JobsRepository) Get(ctx context.Context, jobID string) (map[string]string, error) {
-	key := fmt.Sprintf("dronc:%s", jobID)
+// GetApiCallerJob retrieves an ApiCallerJob from Redis by job ID
+func (r *JobsRepository) GetApiCallerJob(ctx context.Context, jobID string) (*job.ApiCallerJob, error) {
+	key := buildRedisKey(jobID)
 
 	result, err := r.client.HGetAll(ctx, key).Result()
 	if err != nil {
@@ -45,12 +44,18 @@ func (r *JobsRepository) Get(ctx context.Context, jobID string) (map[string]stri
 		return nil, fmt.Errorf("job not found: %s", jobID)
 	}
 
-	return result, nil
+	// Use mapper to reconstruct job from hash
+	apiJob, err := apiCallerJobFromRedisHash(jobID, result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct job from redis data: %w", err)
+	}
+
+	return apiJob, nil
 }
 
 // Delete removes a job from Redis by job ID
 func (r *JobsRepository) Delete(ctx context.Context, jobID string) error {
-	key := fmt.Sprintf("dronc:%s", jobID)
+	key := buildRedisKey(jobID)
 
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
@@ -62,7 +67,7 @@ func (r *JobsRepository) Delete(ctx context.Context, jobID string) error {
 
 // Exists checks if a job exists in Redis by job ID
 func (r *JobsRepository) Exists(ctx context.Context, jobID string) (bool, error) {
-	key := fmt.Sprintf("dronc:%s", jobID)
+	key := buildRedisKey(jobID)
 
 	count, err := r.client.Exists(ctx, key).Result()
 	if err != nil {

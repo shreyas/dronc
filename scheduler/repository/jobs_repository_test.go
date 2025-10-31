@@ -71,12 +71,9 @@ func TestJobsRepository_SaveApiCallerJob(t *testing.T) {
 	if hash["api"] != "https://example.com/api" {
 		t.Errorf("Saved hash api = %v, want %v", hash["api"], "https://example.com/api")
 	}
-	if hash["namespace"] != "capi" {
-		t.Errorf("Saved hash namespace = %v, want %v", hash["namespace"], "capi")
-	}
 }
 
-func TestJobsRepository_Get(t *testing.T) {
+func TestJobsRepository_GetApiCallerJob(t *testing.T) {
 	client, mr := setupTestRedis(t)
 	defer mr.Close()
 
@@ -99,31 +96,28 @@ func TestJobsRepository_Get(t *testing.T) {
 	}
 
 	// Get job
-	result, err := repo.Get(ctx, apiJob.ID)
+	retrievedJob, err := repo.GetApiCallerJob(ctx, apiJob.ID)
 	if err != nil {
-		t.Errorf("Get() error = %v, want nil", err)
+		t.Errorf("GetApiCallerJob() error = %v, want nil", err)
 	}
 
-	// Verify retrieved data (ID should NOT be in hash)
-	if _, exists := result["id"]; exists {
-		t.Errorf("Get() should not return 'id' field in hash")
+	// Verify retrieved job matches original
+	if retrievedJob.ID != apiJob.ID {
+		t.Errorf("GetApiCallerJob() ID = %v, want %v", retrievedJob.ID, apiJob.ID)
 	}
-
-	if result["schedule"] != "*/5 * * * *" {
-		t.Errorf("Get() schedule = %v, want %v", result["schedule"], "*/5 * * * *")
+	if retrievedJob.Schedule != "*/5 * * * *" {
+		t.Errorf("GetApiCallerJob() schedule = %v, want %v", retrievedJob.Schedule, "*/5 * * * *")
 	}
-	if result["type"] != "1" {
-		t.Errorf("Get() type = %v, want %v", result["type"], "1")
+	if retrievedJob.Type != job.AtLeastOnce {
+		t.Errorf("GetApiCallerJob() type = %v, want %v", retrievedJob.Type, job.AtLeastOnce)
 	}
-	if result["api"] != "https://example.com/webhook" {
-		t.Errorf("Get() api = %v, want %v", result["api"], "https://example.com/webhook")
+	if retrievedJob.API != "https://example.com/webhook" {
+		t.Errorf("GetApiCallerJob() api = %v, want %v", retrievedJob.API, "https://example.com/webhook")
 	}
-	if result["namespace"] != "capi" {
-		t.Errorf("Get() namespace = %v, want %v", result["namespace"], "capi")
-	}
+	// Note: namespace is not reconstructed from Redis as it's determined by job type
 }
 
-func TestJobsRepository_Get_NotFound(t *testing.T) {
+func TestJobsRepository_GetApiCallerJob_NotFound(t *testing.T) {
 	client, mr := setupTestRedis(t)
 	defer mr.Close()
 
@@ -131,9 +125,9 @@ func TestJobsRepository_Get_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// Try to get non-existent job
-	_, err := repo.Get(ctx, "capi:nonexistent")
+	_, err := repo.GetApiCallerJob(ctx, "capi:nonexistent")
 	if err == nil {
-		t.Errorf("Get() error = nil, want error for non-existent job")
+		t.Errorf("GetApiCallerJob() error = nil, want error for non-existent job")
 	}
 }
 

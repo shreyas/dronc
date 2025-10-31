@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	redisClient "github.com/shreyas/dronc/lib/redis"
+	_ "github.com/shreyas/dronc/scheduler/repository" // Import for side effects
 )
 
 func TestScheduleApiCaller(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/shreyas/dronc/scheduler/job"
+	"github.com/shreyas/dronc/scheduler/repository"
 )
 
 func setupTestRedis(t *testing.T) (*redis.Client, *miniredis.Miniredis) {
@@ -26,7 +27,8 @@ func TestJobsManager_SetupNewJob_ApiCallerJob(t *testing.T) {
 	client, mr := setupTestRedis(t)
 	defer mr.Close()
 
-	manager := NewJobsManager(client)
+	repo := repository.NewJobsRepository(client)
+	manager := NewJobsManager(repo)
 	ctx := context.Background()
 
 	apiJob, err := job.NewApiCallerJob(job.ApiCallerJobRequest{
@@ -71,16 +73,14 @@ func TestJobsManager_SetupNewJob_ApiCallerJob(t *testing.T) {
 	if hash["api"] != "https://example.com/api" {
 		t.Errorf("Saved job api = %v, want %v", hash["api"], "https://example.com/api")
 	}
-	if hash["namespace"] != "capi" {
-		t.Errorf("Saved job namespace = %v, want %v", hash["namespace"], "capi")
-	}
 }
 
 func TestJobsManager_SetupNewJob_UnsupportedType(t *testing.T) {
 	client, mr := setupTestRedis(t)
 	defer mr.Close()
 
-	manager := NewJobsManager(client)
+	repo := repository.NewJobsRepository(client)
+	manager := NewJobsManager(repo)
 	ctx := context.Background()
 
 	// Try to setup an unsupported job type
@@ -104,7 +104,8 @@ func TestJobsManager_SetupNewJob_MultipleJobs(t *testing.T) {
 	client, mr := setupTestRedis(t)
 	defer mr.Close()
 
-	manager := NewJobsManager(client)
+	repo := repository.NewJobsRepository(client)
+	manager := NewJobsManager(repo)
 	ctx := context.Background()
 
 	jobs := []job.ApiCallerJobRequest{
@@ -158,7 +159,8 @@ func TestJobsManager_SetupNewJob_IdempotencyCheck(t *testing.T) {
 	client, mr := setupTestRedis(t)
 	defer mr.Close()
 
-	manager := NewJobsManager(client)
+	repo := repository.NewJobsRepository(client)
+	manager := NewJobsManager(repo)
 	ctx := context.Background()
 
 	// Create the same job twice (same parameters)

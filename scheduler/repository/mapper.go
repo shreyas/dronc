@@ -7,35 +7,49 @@ import (
 	"github.com/shreyas/dronc/scheduler/job"
 )
 
-// jobMapper is an internal interface for converting jobs to/from Redis hash format
-//
-//nolint:unused // This interface is used internally by repository methods
-type jobMapper interface {
-	redisKey() string
-	toRedisHash() map[string]interface{}
-}
-
-// apiCallerJobMapper implements jobMapper for ApiCallerJob
-type apiCallerJobMapper struct {
-	job *job.ApiCallerJob
-}
-
-// newApiCallerJobMapper creates a new mapper for ApiCallerJob
-func newApiCallerJobMapper(j *job.ApiCallerJob) *apiCallerJobMapper {
-	return &apiCallerJobMapper{job: j}
-}
-
-// redisKey returns the Redis key with "dronc:" prefix
-func (m *apiCallerJobMapper) redisKey() string {
-	return fmt.Sprintf("dronc:%s", m.job.ID)
-}
-
-// toRedisHash converts the job to a Redis hash map (without ID)
-func (m *apiCallerJobMapper) toRedisHash() map[string]interface{} {
+// apiCallerJobToRedisHash converts an ApiCallerJob to a Redis hash map (without ID)
+func apiCallerJobToRedisHash(j *job.ApiCallerJob) map[string]interface{} {
 	return map[string]interface{}{
-		"schedule":  m.job.Schedule,
-		"type":      strconv.Itoa(int(m.job.Type)),
-		"api":       m.job.API,
-		"namespace": m.job.Namespace(),
+		"schedule": j.Schedule,
+		"type":     strconv.Itoa(int(j.Type)),
+		"api":      j.API,
 	}
+}
+
+// apiCallerJobFromRedisHash reconstructs an ApiCallerJob from Redis hash data
+// jobID must be provided as it's not stored in the hash
+func apiCallerJobFromRedisHash(jobID string, data map[string]string) (*job.ApiCallerJob, error) {
+	// Validate required fields
+	schedule, ok := data["schedule"]
+	if !ok {
+		return nil, fmt.Errorf("missing required field: schedule")
+	}
+
+	typeStr, ok := data["type"]
+	if !ok {
+		return nil, fmt.Errorf("missing required field: type")
+	}
+
+	api, ok := data["api"]
+	if !ok {
+		return nil, fmt.Errorf("missing required field: api")
+	}
+
+	// Parse type
+	typeInt, err := strconv.Atoi(typeStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid type value: %w", err)
+	}
+
+	// Create job with reconstructed fields
+	apiJob := &job.ApiCallerJob{
+		Job: job.Job{
+			ID:       jobID,
+			Schedule: schedule,
+			Type:     job.JobRunGuarantee(typeInt),
+		},
+		API: api,
+	}
+
+	return apiJob, nil
 }
