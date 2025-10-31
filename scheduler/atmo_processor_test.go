@@ -69,6 +69,10 @@ func (m *mockExecEventsRepoAtmo) SaveExecutionEvent(ctx context.Context, event r
 	return nil
 }
 
+func (m *mockExecEventsRepoAtmo) ListExecutionEvents(ctx context.Context, query repository.ExecutionEventsQuery) ([]repository.ExecutionEventRecord, error) {
+	return nil, nil
+}
+
 func TestAtmoProcessor_callAPI_Success(t *testing.T) {
 	// Create a test server that always succeeds
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -185,6 +189,10 @@ func TestAtmoProcessor_Process_Success(t *testing.T) {
 		if event.StatusCode != http.StatusOK {
 			t.Errorf("expected status code 200, got %d", event.StatusCode)
 		}
+
+		if event.TimeTakenMillis < 0 {
+			t.Errorf("expected TimeTakenMillis >= 0, got %d", event.TimeTakenMillis)
+		}
 	}
 }
 
@@ -236,6 +244,10 @@ func TestAtmoProcessor_Process_Failure(t *testing.T) {
 		}
 		if event.StatusCode != http.StatusInternalServerError {
 			t.Errorf("expected status code 500, got %d", event.StatusCode)
+		}
+
+		if event.TimeTakenMillis < 0 {
+			t.Errorf("expected TimeTakenMillis >= 0, got %d", event.TimeTakenMillis)
 		}
 	}
 }

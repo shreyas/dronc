@@ -71,6 +71,10 @@ func (m *mockExecEventsRepo) SaveExecutionEvent(ctx context.Context, event repos
 	return m.saveErr
 }
 
+func (m *mockExecEventsRepo) ListExecutionEvents(ctx context.Context, query repository.ExecutionEventsQuery) ([]repository.ExecutionEventRecord, error) {
+	return nil, nil
+}
+
 func TestAtloProcessor_extractTimestampFromJobSpec(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -292,6 +296,11 @@ func TestAtloProcessor_Process_Success(t *testing.T) {
 		if event.JobID != apiJob.ID {
 			t.Errorf("expected job ID %s, got %s", apiJob.ID, event.JobID)
 		}
+
+		// Ensure time taken is recorded in milliseconds (non-negative)
+		if event.TimeTakenMillis < 0 {
+			t.Errorf("expected TimeTakenMillis >= 0, got %d", event.TimeTakenMillis)
+		}
 	}
 }
 
@@ -356,6 +365,11 @@ func TestAtloProcessor_Process_AllRetriesFail(t *testing.T) {
 		// So status code is 0 (no successful response received)
 		if event.StatusCode != 0 {
 			t.Errorf("expected status code 0, got %d", event.StatusCode)
+		}
+
+		// Ensure time taken is recorded in milliseconds (non-negative)
+		if event.TimeTakenMillis < 0 {
+			t.Errorf("expected TimeTakenMillis >= 0, got %d", event.TimeTakenMillis)
 		}
 	}
 }

@@ -71,18 +71,21 @@ func (p *atmoProcessor) processJob(ctx context.Context, req JobExecutionRequest)
 		return
 	}
 
-	// Call API with single attempt (no retries)
+	// Call API with single attempt (no retries) and measure time taken
+	start := time.Now()
 	statusCode, success := p.callAPI(ctx, req.Job.API)
+	timeTakenMs := time.Since(start).Milliseconds()
 
 	executionTime := time.Now().Unix()
 
 	// Save execution event to Redis streams (regardless of success/failure)
 	event := repository.ExecutionEvent{
-		JobID:         req.Job.ID,
-		ScheduledTime: scheduledTime,
-		ExecutionTime: executionTime,
-		StatusCode:    statusCode,
-		Success:       success,
+		JobID:           req.Job.ID,
+		ScheduledTime:   scheduledTime,
+		ExecutionTime:   executionTime,
+		StatusCode:      statusCode,
+		Success:         success,
+		TimeTakenMillis: timeTakenMs,
 	}
 
 	if err := p.execEventsRepo.SaveExecutionEvent(ctx, event); err != nil {
