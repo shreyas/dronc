@@ -5,7 +5,9 @@ go 1.23.0
 toolchain go1.24.9
 
 require (
+	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/gin-gonic/gin v1.11.0
+	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/redis/go-redis/v9 v9.16.0
 	go.uber.org/zap v1.27.0
 )
@@ -34,6 +36,7 @@ require (
 	github.com/quic-go/quic-go v0.54.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/arch v0.20.0 // indirect
