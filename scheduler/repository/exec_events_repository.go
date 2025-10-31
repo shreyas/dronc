@@ -26,6 +26,7 @@ func (r *ExecEventsRepository) SaveExecutionEvent(ctx context.Context, event Exe
 		"execution_time": event.ExecutionTime,
 		"status_code":    event.StatusCode,
 		"success":        strconv.FormatBool(event.Success),
+		"time_taken_ms":  event.TimeTakenMillis,
 	}
 
 	_, err := r.client.XAdd(ctx, &redis.XAddArgs{

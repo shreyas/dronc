@@ -75,19 +75,22 @@ func (p *atloProcessor) processJob(ctx context.Context, req JobExecutionRequest)
 	}
 
 	// todo: we need a job specific dispatcher here. the execution has to be job type agnostic
-	// Call API with exponential backoff and retries
+	// Call API with exponential backoff and retries; measure time taken
+	start := time.Now()
 	statusCode, success := p.callAPI(ctx, req.Job.API)
+	timeTakenMs := time.Since(start).Milliseconds()
 
 	executionTime := time.Now().Unix()
 
 	if success {
 		// Save execution event to Redis streams
 		event := repository.ExecutionEvent{
-			JobID:         req.Job.ID,
-			ScheduledTime: scheduledTime,
-			ExecutionTime: executionTime,
-			StatusCode:    statusCode,
-			Success:       true,
+			JobID:           req.Job.ID,
+			ScheduledTime:   scheduledTime,
+			ExecutionTime:   executionTime,
+			StatusCode:      statusCode,
+			Success:         true,
+			TimeTakenMillis: timeTakenMs,
 		}
 
 		if err := p.execEventsRepo.SaveExecutionEvent(ctx, event); err != nil {
@@ -111,11 +114,12 @@ func (p *atloProcessor) processJob(ctx context.Context, req JobExecutionRequest)
 
 		// Still save the failed execution event
 		event := repository.ExecutionEvent{
-			JobID:         req.Job.ID,
-			ScheduledTime: scheduledTime,
-			ExecutionTime: executionTime,
-			StatusCode:    statusCode,
-			Success:       false,
+			JobID:           req.Job.ID,
+			ScheduledTime:   scheduledTime,
+			ExecutionTime:   executionTime,
+			StatusCode:      statusCode,
+			Success:         false,
+			TimeTakenMillis: timeTakenMs,
 		}
 
 		if err := p.execEventsRepo.SaveExecutionEvent(ctx, event); err != nil {

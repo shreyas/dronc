@@ -9,6 +9,8 @@ type ExecutionEvent struct {
 	ExecutionTime int64
 	StatusCode    int
 	Success       bool
+	// TimeTakenMillis indicates how long the job took to execute in milliseconds
+	TimeTakenMillis int64
 }
 
 // ExecEventsRepositoryInterface defines operations for managing job execution events

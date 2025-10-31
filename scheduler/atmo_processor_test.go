@@ -185,6 +185,10 @@ func TestAtmoProcessor_Process_Success(t *testing.T) {
 		if event.StatusCode != http.StatusOK {
 			t.Errorf("expected status code 200, got %d", event.StatusCode)
 		}
+
+		if event.TimeTakenMillis < 0 {
+			t.Errorf("expected TimeTakenMillis >= 0, got %d", event.TimeTakenMillis)
+		}
 	}
 }
 
@@ -236,6 +240,10 @@ func TestAtmoProcessor_Process_Failure(t *testing.T) {
 		}
 		if event.StatusCode != http.StatusInternalServerError {
 			t.Errorf("expected status code 500, got %d", event.StatusCode)
+		}
+
+		if event.TimeTakenMillis < 0 {
+			t.Errorf("expected TimeTakenMillis >= 0, got %d", event.TimeTakenMillis)
 		}
 	}
 }
