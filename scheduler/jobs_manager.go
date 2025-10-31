@@ -35,6 +35,9 @@ type JobsManager struct {
 	// atloProcessor handles the processing of at-least-once jobs
 	atloProcessor *atloProcessor
 
+	// atmoProcessor handles the processing of at-most-once jobs
+	atmoProcessor *atmoProcessor
+
 	// configurations
 	// how many schedules to generate on setup of a new job
 	numSchedulesToGenerate int
@@ -54,9 +57,10 @@ func NewJobsManager(jobsRepo repository.JobsRepositoryInterface, schedulesRepo r
 		schedulesRepo = repository.NewSchedulesRepository(redis.Client)
 	}
 
-	// Create ATLO processor dependencies
+	// Create processor dependencies
 	execEventsRepo := repository.NewExecEventsRepository(redis.Client)
 	atloProcessor := newAtloProcessor(jobsRepo, execEventsRepo)
+	atmoProcessor := newAtmoProcessor(jobsRepo, execEventsRepo)
 
 	return &JobsManager{
 		repo:          jobsRepo,
@@ -65,6 +69,7 @@ func NewJobsManager(jobsRepo repository.JobsRepositoryInterface, schedulesRepo r
 		atloChannel:   make(chan JobExecutionRequest, 10000), // AtLeastOnce jobs
 		atmoChannel:   make(chan JobExecutionRequest, 10000), // AtMostOnce jobs
 		atloProcessor: atloProcessor,
+		atmoProcessor: atmoProcessor,
 
 		// config options
 		numSchedulesToGenerate: 5,
@@ -302,6 +307,39 @@ func (m *JobsManager) StartAtloProcessor(ctx context.Context) {
 	}()
 }
 
+// StartAtmoProcessor begins the at-most-once job processor goroutine
+// It reads job execution requests from the atmoChannel and spawns worker goroutines for each job
+// The goroutine runs until the context is cancelled and recovers from all panics
+func (m *JobsManager) StartAtmoProcessor(ctx context.Context) {
+	go func() {
+		// Recover from any panics to prevent goroutine death
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("atmo processor goroutine panicked and recovered", "panic", r)
+				// Restart the goroutine after a panic
+				logger.Info("restarting atmo processor goroutine after panic")
+				m.StartAtmoProcessor(ctx)
+			}
+		}()
+
+		logger.Info("atmo processor goroutine started")
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("atmo processor goroutine stopping due to context cancellation")
+				// Wait for all worker goroutines to complete
+				m.atmoProcessor.Wait()
+				logger.Info("all atmo worker goroutines completed")
+				return
+			case req := <-m.atmoChannel:
+				// Process the job (spawns worker goroutine internally)
+				m.atmoProcessor.Process(ctx, req)
+			}
+		}
+	}()
+}
+
 // SetupNewJob stores a new job in the repository and schedules its next occurrences
 // It routes to the appropriate repository method based on the job type
 func (m *JobsManager) SetupNewJob(ctx context.Context, j interface{}) error {
@@ -353,4 +391,12 @@ func (m *JobsManager) scheduleNextOccurrences(ctx context.Context, jobID string,
 	}
 
 	return nil
+}
+
+// Run starts all the main goroutines of the JobsManager
+func (m *JobsManager) Run(ctx context.Context) {
+	m.StartDueJobsFinder(ctx)
+	m.StartJobBatchProcessor(ctx)
+	m.StartAtloProcessor(ctx)
+	m.StartAtmoProcessor(ctx)
 }

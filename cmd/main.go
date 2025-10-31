@@ -44,10 +44,8 @@ func main() {
 
 	// Create JobsManager and start the processing goroutines
 	jobsManager := scheduler.NewJobsManager(nil, nil)
-	jobsManager.StartDueJobsFinder(ctx)
-	jobsManager.StartJobBatchProcessor(ctx)
-	jobsManager.StartAtloProcessor(ctx)
-	logger.Info("jobs manager started with due jobs finder, batch processor, and atlo processor")
+	jobsManager.Run(ctx)
+	logger.Info("jobs manager started")
 
 	// Create HTTP server for API routes
 	server := httpserver.New(routes.Setup())

@@ -56,6 +56,10 @@ func (m *mockJobsRepo) RemoveFromProcessing(ctx context.Context, jobSpec string)
 	return m.removeFromProcessingErr
 }
 
+func (m *mockJobsRepo) RemoveFromDueAndScheduleNext(ctx context.Context, jobSpec string, nextTimestamp int64) error {
+	return nil
+}
+
 // mockExecEventsRepo is a mock implementation of ExecEventsRepositoryInterface
 type mockExecEventsRepo struct {
 	savedEvents []repository.ExecutionEvent

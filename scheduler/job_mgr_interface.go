@@ -20,6 +20,10 @@ type JobsManagerInterface interface {
 	// It reads job execution requests from the atloChannel and spawns worker goroutines for each job
 	StartAtloProcessor(ctx context.Context)
 
+	// StartAtmoProcessor begins the at-most-once job processor goroutine
+	// It reads job execution requests from the atmoChannel and spawns worker goroutines for each job
+	StartAtmoProcessor(ctx context.Context)
+
 	// GetDueJobsChannel returns a read-only channel for consuming due job-specs
 	GetDueJobsChannel() <-chan string
 
@@ -28,4 +32,7 @@ type JobsManagerInterface interface {
 
 	// GetAtMostOnceChannel returns a read-only channel for consuming AtMostOnce job execution requests
 	GetAtMostOnceChannel() <-chan JobExecutionRequest
+
+	// Run starts all job manager components (goroutines)
+	Run(ctx context.Context)
 }

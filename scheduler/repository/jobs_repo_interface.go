@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"github.com/shreyas/dronc/scheduler/job"
 )
 
@@ -32,4 +33,8 @@ type JobsRepositoryInterface interface {
 
 	// RemoveFromProcessing removes a job-spec from the processing_jobs set
 	RemoveFromProcessing(ctx context.Context, jobSpec string) error
+
+	// RemoveFromDueAndScheduleNext atomically removes a job-spec from due_jobs
+	// and schedules the next occurrence in the schedules sorted set
+	RemoveFromDueAndScheduleNext(ctx context.Context, jobSpec string, nextTimestamp int64) error
 }

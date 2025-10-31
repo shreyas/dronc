@@ -486,3 +486,107 @@ func TestJobsRepository_RemoveFromProcessing_NotFound(t *testing.T) {
 		t.Errorf("RemoveFromProcessing() error = %v, want 'job-spec not found in processing_jobs set'", err)
 	}
 }
+
+func TestJobsRepository_RemoveFromDueAndScheduleNext(t *testing.T) {
+	client, mr := setupTestRedis(t)
+	defer mr.Close()
+
+	repo := NewJobsRepository(client)
+	ctx := context.Background()
+
+	// Create test data
+	jobSpec := "test-job:1698764400"
+	nextTimestamp := int64(1698764700) // 5 minutes later
+
+	// Add job-spec to due_jobs set
+	err := client.SAdd(ctx, "dronc:due_jobs", jobSpec).Err()
+	if err != nil {
+		t.Fatalf("Failed to add job to due_jobs: %v", err)
+	}
+
+	// Call the method
+	err = repo.RemoveFromDueAndScheduleNext(ctx, jobSpec, nextTimestamp)
+	if err != nil {
+		t.Errorf("RemoveFromDueAndScheduleNext() error = %v, want nil", err)
+	}
+
+	// Verify job was removed from due_jobs
+	isMember, err := client.SIsMember(ctx, "dronc:due_jobs", jobSpec).Result()
+	if err != nil {
+		t.Fatalf("Failed to check due_jobs membership: %v", err)
+	}
+	if isMember {
+		t.Errorf("Job still exists in due_jobs after removal")
+	}
+
+	// Verify next occurrence was scheduled
+	score, err := client.ZScore(ctx, "dronc:schedules", jobSpec).Result()
+	if err != nil {
+		t.Fatalf("Failed to check schedules score: %v", err)
+	}
+	if int64(score) != nextTimestamp {
+		t.Errorf("Scheduled timestamp = %v, want %v", int64(score), nextTimestamp)
+	}
+}
+
+func TestJobsRepository_RemoveFromDueAndScheduleNext_NotFound(t *testing.T) {
+	client, mr := setupTestRedis(t)
+	defer mr.Close()
+
+	repo := NewJobsRepository(client)
+	ctx := context.Background()
+
+	// Try to remove a job-spec that doesn't exist
+	jobSpec := "non-existent-job:1698764400"
+	nextTimestamp := int64(1698764700)
+
+	err := repo.RemoveFromDueAndScheduleNext(ctx, jobSpec, nextTimestamp)
+	if err == nil {
+		t.Errorf("RemoveFromDueAndScheduleNext() error = nil, want error")
+	}
+	if err != nil && err.Error() != "job-spec not found in due_jobs set: non-existent-job:1698764400" {
+		t.Errorf("RemoveFromDueAndScheduleNext() error = %v, want 'job-spec not found in due_jobs set'", err)
+	}
+}
+
+func TestJobsRepository_RemoveFromDueAndScheduleNext_DoesNotOverwriteExistingSchedule(t *testing.T) {
+	client, mr := setupTestRedis(t)
+	defer mr.Close()
+
+	repo := NewJobsRepository(client)
+	ctx := context.Background()
+
+	jobSpec := "test-job:1698764400"
+	existingTimestamp := int64(1698764500)
+	newTimestamp := int64(1698764700)
+
+	// Pre-add job-spec to schedules with an existing timestamp
+	err := client.ZAdd(ctx, "dronc:schedules", redis.Z{
+		Score:  float64(existingTimestamp),
+		Member: jobSpec,
+	}).Err()
+	if err != nil {
+		t.Fatalf("Failed to add job to schedules: %v", err)
+	}
+
+	// Add job-spec to due_jobs set
+	err = client.SAdd(ctx, "dronc:due_jobs", jobSpec).Err()
+	if err != nil {
+		t.Fatalf("Failed to add job to due_jobs: %v", err)
+	}
+
+	// Call the method with a new timestamp
+	err = repo.RemoveFromDueAndScheduleNext(ctx, jobSpec, newTimestamp)
+	if err != nil {
+		t.Errorf("RemoveFromDueAndScheduleNext() error = %v, want nil", err)
+	}
+
+	// Verify the schedule was NOT overwritten (NX flag in ZADD)
+	score, err := client.ZScore(ctx, "dronc:schedules", jobSpec).Result()
+	if err != nil {
+		t.Fatalf("Failed to check schedules score: %v", err)
+	}
+	if int64(score) != existingTimestamp {
+		t.Errorf("Scheduled timestamp = %v, want %v (should not have been overwritten)", int64(score), existingTimestamp)
+	}
+}

@@ -202,3 +202,45 @@ func (r *JobsRepository) RemoveFromProcessing(ctx context.Context, jobSpec strin
 
 	return nil
 }
+
+// RemoveFromDueAndScheduleNext atomically removes a job-spec from due_jobs
+// and schedules the next occurrence in the schedules sorted set
+func (r *JobsRepository) RemoveFromDueAndScheduleNext(ctx context.Context, jobSpec string, nextTimestamp int64) error {
+	// Lua script to atomically remove job from due_jobs and schedule next occurrence
+	removeAndScheduleScript := redis.NewScript(`
+		local due_jobs_key = KEYS[1]
+		local schedules_key = KEYS[2]
+		local job_spec = ARGV[1]
+		local next_timestamp = ARGV[2]
+
+		-- Remove job from due_jobs
+		local removed = redis.call('SREM', due_jobs_key, job_spec)
+		
+		if removed == 1 then
+			-- Schedule next occurrence (NX = only if not exists)
+			redis.call('ZADD', schedules_key, 'NX', next_timestamp, job_spec)
+			return 1
+		end
+		
+		return 0
+	`)
+
+	result, err := removeAndScheduleScript.Run(
+		ctx,
+		r.client,
+		[]string{dueJobsKey, schedulesKey},
+		jobSpec,
+		nextTimestamp,
+	).Result()
+
+	if err != nil {
+		return fmt.Errorf("failed to remove from due and schedule next: %w", err)
+	}
+
+	// Check if the removal was successful
+	if result.(int64) == 0 {
+		return fmt.Errorf("job-spec not found in due_jobs set: %s", jobSpec)
+	}
+
+	return nil
+}
